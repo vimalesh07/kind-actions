@@ -95,9 +95,14 @@ function Kiosk() {
                 <div className="rounded-md bg-muted px-2 py-2"><div className="text-muted-foreground">Borrowed</div><div className="font-bold text-base">2</div></div>
                 <div className="rounded-md bg-muted px-2 py-2"><div className="text-muted-foreground">Auto-pay</div><div className="font-bold text-base">{student.autoPay ? "ON" : "OFF"}</div></div>
               </div>
-              <button className="mt-5 w-full rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
-                Continue → Scan book QR
-              </button>
+              <div className="mt-5 grid gap-2">
+                <button className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
+                  Continue → Scan book QR
+                </button>
+                <Link to="/user" className="w-full rounded-lg border border-border py-3 text-center text-sm font-semibold hover:bg-accent">
+                  Generate bill and pay
+                </Link>
+              </div>
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, QrCode, Receipt, ScanLine, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BookOpen, CreditCard, QrCode, Receipt, ScanLine, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Logo } from "@/components/booknest/Logo";
 
 export const Route = createFileRoute("/")({
@@ -27,8 +27,8 @@ function Landing() {
             <Link to="/rfid" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-accent">
               <ScanLine className="h-4 w-4" /> Kiosk
             </Link>
-            <Link to="/admin" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
-              Open Admin <ArrowRight className="h-4 w-4" />
+            <Link to="/user" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
+              User Payment <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -56,8 +56,8 @@ function Landing() {
               Book Nest replaces clipboards and stamp pads with RFID cards, QR codes and a wallet that handles fines automatically — so your librarians can focus on books, not paperwork.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/admin" className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
-                Explore Admin Dashboard <ArrowRight className="h-4 w-4" />
+              <Link to="/user" className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--color-primary-dark)]">
+                Generate Payment Bill <ArrowRight className="h-4 w-4" />
               </Link>
               <Link to="/rfid" className="inline-flex items-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-semibold text-primary hover:bg-accent">
                 Try Student Kiosk
@@ -123,7 +123,7 @@ function Landing() {
             {[
               { icon: ScanLine, title: "RFID Authentication", body: "Tap a card, log in. Zero passwords, zero queues, zero fraud." },
               { icon: QrCode, title: "QR Borrow & Return", body: "Each copy has a unique QR. Camera-scan to borrow or return in under 5 seconds." },
-              { icon: Receipt, title: "Wallet-based Fines", body: "₹1/day overdue, ₹30 monthly subscription. Auto-deducted from student wallets." },
+              { icon: CreditCard, title: "UPI Bill Payments", body: "Auto-generate the payable amount from fines and monthly fee, then scan an exact-amount UPI QR." },
               { icon: Users, title: "Department-aware", body: "CSE, AIDS, ECE, EEE, Mech, Civil — analytics and limits scoped per dept." },
               { icon: BookOpen, title: "Shelf-precise Locations", body: "Books indexed by Section A–E, row, and position. Find any title in seconds." },
               { icon: ShieldCheck, title: "Audit-grade Logs", body: "Every borrow, return, fine, payment — timestamped and tied to the actor." },
@@ -161,14 +161,14 @@ function Landing() {
       <section id="roles" className="bg-[oklch(0.14_0.01_25)] text-white">
         <div className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Built for two kinds of users.</h2>
-            <p className="mt-3 text-white/70 max-w-md">A focused kiosk for students and a powerful dashboard for librarians — same data, same source of truth.</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Built for students first.</h2>
+            <p className="mt-3 text-white/70 max-w-md">A focused user section for RFID access, generated bills, and exact-amount UPI payments.</p>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
-            <Link to="/admin" className="rounded-2xl bg-[var(--color-primary)] p-6 hover:bg-[var(--color-primary-light)] transition-colors">
-              <div className="text-xs uppercase tracking-wider opacity-80">Librarian</div>
-              <div className="mt-2 text-2xl font-bold">Admin Console</div>
-              <div className="mt-2 text-sm opacity-80">Books CRUD, students, fines, analytics, QR printing.</div>
+            <Link to="/user" className="rounded-2xl bg-[var(--color-primary)] p-6 hover:bg-[var(--color-primary-light)] transition-colors">
+              <div className="text-xs uppercase tracking-wider opacity-80">Student</div>
+              <div className="mt-2 text-2xl font-bold">User Payment</div>
+              <div className="mt-2 text-sm opacity-80">Auto amount, generated bill, and UPI QR in one page.</div>
               <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold">Open <ArrowRight className="h-4 w-4" /></div>
             </Link>
             <Link to="/rfid" className="rounded-2xl border border-white/15 bg-white/5 p-6 hover:bg-white/10">

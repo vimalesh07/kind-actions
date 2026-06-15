@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AdminShell } from "@/components/booknest/AdminShell";
 import { findBook, findStudent, transactions } from "@/lib/booknest/data";
 
@@ -56,7 +56,9 @@ function FinesPage() {
                   <td className="px-4 py-3 font-bold text-destructive">₹{t.fineAmount}</td>
                   <td className="px-4 py-3 text-right space-x-2">
                     <button className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold hover:bg-accent">Waive</button>
-                    <button className="rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-primary-dark)]">Mark paid</button>
+                    <Link to="/user" className="rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:bg-[var(--color-primary-dark)]">
+                      Generate bill
+                    </Link>
                   </td>
                 </tr>
               );

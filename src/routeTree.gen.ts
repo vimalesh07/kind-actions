@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UserRouteImport } from './routes/user'
 import { Route as RfidRouteImport } from './routes/rfid'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +19,11 @@ import { Route as AdminStudentsRouteImport } from './routes/admin.students'
 import { Route as AdminFinesRouteImport } from './routes/admin.fines'
 import { Route as AdminBooksRouteImport } from './routes/admin.books'
 
+const UserRoute = UserRouteImport.update({
+  id: '/user',
+  path: '/user',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RfidRoute = RfidRouteImport.update({
   id: '/rfid',
   path: '/rfid',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/rfid': typeof RfidRoute
+  '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
   '/admin/students': typeof AdminStudentsRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/rfid': typeof RfidRoute
+  '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
   '/admin/students': typeof AdminStudentsRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/rfid': typeof RfidRoute
+  '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
   '/admin/students': typeof AdminStudentsRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/rfid'
+    | '/user'
     | '/admin/books'
     | '/admin/fines'
     | '/admin/students'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/rfid'
+    | '/user'
     | '/admin/books'
     | '/admin/fines'
     | '/admin/students'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/rfid'
+    | '/user'
     | '/admin/books'
     | '/admin/fines'
     | '/admin/students'
@@ -125,10 +137,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   RfidRoute: typeof RfidRoute
+  UserRoute: typeof UserRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/user': {
+      id: '/user'
+      path: '/user'
+      fullPath: '/user'
+      preLoaderRoute: typeof UserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rfid': {
       id: '/rfid'
       path: '/rfid'
@@ -210,6 +230,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   RfidRoute: RfidRoute,
+  UserRoute: UserRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
