@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UserRouteImport } from './routes/user'
-import { Route as RfidRouteImport } from './routes/rfid'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ScannerRouteImport } from './routes/scanner'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as HomeRouteImport } from './routes/home'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as BooksIdRouteImport } from './routes/books.$id'
 import { Route as AdminTransactionsRouteImport } from './routes/admin.transactions'
 import { Route as AdminStudentsRouteImport } from './routes/admin.students'
+import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminFinesRouteImport } from './routes/admin.fines'
 import { Route as AdminBooksRouteImport } from './routes/admin.books'
 
@@ -24,9 +32,39 @@ const UserRoute = UserRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RfidRoute = RfidRouteImport.update({
-  id: '/rfid',
-  path: '/rfid',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScannerRoute = ScannerRouteImport.update({
+  id: '/scanner',
+  path: '/scanner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -44,6 +82,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const BooksIdRoute = BooksIdRouteImport.update({
+  id: '/books/$id',
+  path: '/books/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminTransactionsRoute = AdminTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
@@ -52,6 +95,11 @@ const AdminTransactionsRoute = AdminTransactionsRouteImport.update({
 const AdminStudentsRoute = AdminStudentsRouteImport.update({
   id: '/students',
   path: '/students',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFinesRoute = AdminFinesRouteImport.update({
@@ -68,34 +116,58 @@ const AdminBooksRoute = AdminBooksRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/rfid': typeof RfidRoute
+  '/auth': typeof AuthRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/profile': typeof ProfileRoute
+  '/scanner': typeof ScannerRoute
+  '/signup': typeof SignupRoute
   '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
+  '/books/$id': typeof BooksIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/rfid': typeof RfidRoute
+  '/auth': typeof AuthRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/profile': typeof ProfileRoute
+  '/scanner': typeof ScannerRoute
+  '/signup': typeof SignupRoute
   '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
+  '/books/$id': typeof BooksIdRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/rfid': typeof RfidRoute
+  '/auth': typeof AuthRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/payments': typeof PaymentsRoute
+  '/profile': typeof ProfileRoute
+  '/scanner': typeof ScannerRoute
+  '/signup': typeof SignupRoute
   '/user': typeof UserRoute
   '/admin/books': typeof AdminBooksRoute
   '/admin/fines': typeof AdminFinesRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
+  '/books/$id': typeof BooksIdRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -103,41 +175,72 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/rfid'
+    | '/auth'
+    | '/home'
+    | '/login'
+    | '/payments'
+    | '/profile'
+    | '/scanner'
+    | '/signup'
     | '/user'
     | '/admin/books'
     | '/admin/fines'
+    | '/admin/payments'
     | '/admin/students'
     | '/admin/transactions'
+    | '/books/$id'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/rfid'
+    | '/auth'
+    | '/home'
+    | '/login'
+    | '/payments'
+    | '/profile'
+    | '/scanner'
+    | '/signup'
     | '/user'
     | '/admin/books'
     | '/admin/fines'
+    | '/admin/payments'
     | '/admin/students'
     | '/admin/transactions'
+    | '/books/$id'
     | '/admin'
   id:
     | '__root__'
     | '/'
     | '/admin'
-    | '/rfid'
+    | '/auth'
+    | '/home'
+    | '/login'
+    | '/payments'
+    | '/profile'
+    | '/scanner'
+    | '/signup'
     | '/user'
     | '/admin/books'
     | '/admin/fines'
+    | '/admin/payments'
     | '/admin/students'
     | '/admin/transactions'
+    | '/books/$id'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
-  RfidRoute: typeof RfidRoute
+  AuthRoute: typeof AuthRoute
+  HomeRoute: typeof HomeRoute
+  LoginRoute: typeof LoginRoute
+  PaymentsRoute: typeof PaymentsRoute
+  ProfileRoute: typeof ProfileRoute
+  ScannerRoute: typeof ScannerRoute
+  SignupRoute: typeof SignupRoute
   UserRoute: typeof UserRoute
+  BooksIdRoute: typeof BooksIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -149,11 +252,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/rfid': {
-      id: '/rfid'
-      path: '/rfid'
-      fullPath: '/rfid'
-      preLoaderRoute: typeof RfidRouteImport
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scanner': {
+      id: '/scanner'
+      path: '/scanner'
+      fullPath: '/scanner'
+      preLoaderRoute: typeof ScannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -177,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/books/$id': {
+      id: '/books/$id'
+      path: '/books/$id'
+      fullPath: '/books/$id'
+      preLoaderRoute: typeof BooksIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/transactions': {
       id: '/admin/transactions'
       path: '/transactions'
@@ -189,6 +341,13 @@ declare module '@tanstack/react-router' {
       path: '/students'
       fullPath: '/admin/students'
       preLoaderRoute: typeof AdminStudentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/fines': {
@@ -211,6 +370,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminBooksRoute: typeof AdminBooksRoute
   AdminFinesRoute: typeof AdminFinesRoute
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminStudentsRoute: typeof AdminStudentsRoute
   AdminTransactionsRoute: typeof AdminTransactionsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -219,6 +379,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminBooksRoute: AdminBooksRoute,
   AdminFinesRoute: AdminFinesRoute,
+  AdminPaymentsRoute: AdminPaymentsRoute,
   AdminStudentsRoute: AdminStudentsRoute,
   AdminTransactionsRoute: AdminTransactionsRoute,
   AdminIndexRoute: AdminIndexRoute,
@@ -229,8 +390,15 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
-  RfidRoute: RfidRoute,
+  AuthRoute: AuthRoute,
+  HomeRoute: HomeRoute,
+  LoginRoute: LoginRoute,
+  PaymentsRoute: PaymentsRoute,
+  ProfileRoute: ProfileRoute,
+  ScannerRoute: ScannerRoute,
+  SignupRoute: SignupRoute,
   UserRoute: UserRoute,
+  BooksIdRoute: BooksIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

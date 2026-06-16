@@ -1,5 +1,5 @@
 import { Link, useRouterState, type LinkProps } from "@tanstack/react-router";
-import { Bell, BookOpen, Coins, LayoutDashboard, QrCode, Receipt, Settings, Users } from "lucide-react";
+import { Bell, BookOpen, Coins, LayoutDashboard, Receipt, Settings, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { Logo } from "./Logo";
 
@@ -11,11 +11,20 @@ const nav: NavItem[] = [
   { to: "/admin/students", label: "Students", icon: Users },
   { to: "/admin/transactions", label: "Transactions", icon: Receipt },
   { to: "/admin/fines", label: "Fines & Payments", icon: Coins },
-  { to: "/rfid", label: "Kiosk Mode", icon: QrCode },
 ];
 
-export function AdminShell({ title, subtitle, children, actions }: { title: string; subtitle?: string; children: ReactNode; actions?: ReactNode }) {
-  const pathname = useRouterState({ select: s => s.location.pathname });
+export function AdminShell({
+  title,
+  subtitle,
+  children,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -25,7 +34,8 @@ export function AdminShell({ title, subtitle, children, actions }: { title: stri
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map(({ to, label, icon: Icon }) => {
-            const active = to === "/admin" ? pathname === "/admin" : pathname.startsWith(to as string);
+            const active =
+              to === "/admin" ? pathname === "/admin" : pathname.startsWith(to as string);
             return (
               <Link
                 key={to}
@@ -34,7 +44,10 @@ export function AdminShell({ title, subtitle, children, actions }: { title: stri
                 style={
                   active
                     ? { background: "var(--color-sidebar-active)", color: "white" }
-                    : { color: "color-mix(in oklch, var(--color-sidebar-foreground) 75%, transparent)" }
+                    : {
+                        color:
+                          "color-mix(in oklch, var(--color-sidebar-foreground) 75%, transparent)",
+                      }
                 }
               >
                 <Icon className="h-4 w-4" />
@@ -60,9 +73,13 @@ export function AdminShell({ title, subtitle, children, actions }: { title: stri
             {actions}
             <button className="relative grid h-9 w-9 place-items-center rounded-lg border border-border bg-card hover:bg-accent">
               <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-4 min-w-4 rounded-full bg-[var(--color-gold)] px-1 text-[10px] font-bold text-black grid place-items-center">3</span>
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 rounded-full bg-[var(--color-gold)] px-1 text-[10px] font-bold text-black grid place-items-center">
+                3
+              </span>
             </button>
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">A</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+              A
+            </div>
           </div>
         </header>
         <div className="px-6 py-6 max-w-[1400px] mx-auto">{children}</div>
@@ -71,7 +88,11 @@ export function AdminShell({ title, subtitle, children, actions }: { title: stri
   );
 }
 
-export function StatusPill({ status }: { status: "available" | "borrowed" | "overdue" | "pending" | "returned" }) {
+export function StatusPill({
+  status,
+}: {
+  status: "available" | "borrowed" | "overdue" | "pending" | "returned";
+}) {
   const map: Record<string, { cls: string; label: string }> = {
     available: { cls: "bn-status-available", label: "Available" },
     borrowed: { cls: "bn-status-borrowed", label: "Borrowed" },
@@ -81,7 +102,9 @@ export function StatusPill({ status }: { status: "available" | "borrowed" | "ove
   };
   const s = map[status];
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${s.cls}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${s.cls}`}
+    >
       {s.label}
     </span>
   );

@@ -1,70 +1,93 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download } from "lucide-react";
-import { AdminShell, StatusPill } from "@/components/booknest/AdminShell";
-import { findBook, findStudent, transactions } from "@/lib/booknest/data";
+import { useEffect, useState } from "react";
+import { AdminPrototypeShell, Card, StatusBadge } from "@/components/booknest/PrototypeShell";
+import { getTransactions } from "@/lib/booknest/db.functions";
+import type { Transaction } from "@/lib/booknest/data";
 
 export const Route = createFileRoute("/admin/transactions")({
-  head: () => ({ meta: [{ title: "Transactions · Book Nest Admin" }] }),
-  component: TxnPage,
+  head: () => ({ meta: [{ title: "Transactions - Book Nest Admin" }] }),
+  component: AdminTransactionsPage,
 });
 
-function TxnPage() {
+function AdminTransactionsPage() {
+  const [filter, setFilter] = useState("All");
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getTransactions()
+      .then(setTransactions)
+      .catch((caught) => setError(readError(caught)));
+  }, []);
+
+  const filtered = transactions.filter((txn) => filter === "All" || txn.status === filter);
+
   return (
-    <AdminShell
+    <AdminPrototypeShell
       title="Transactions"
-      subtitle={`${transactions.length} records · ${transactions.filter(t => t.status === "overdue").length} overdue`}
-      actions={
-        <button className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-accent">
-          <Download className="h-4 w-4" /> Export CSV
-        </button>
-      }
+      subtitle="Borrow and return records saved in PostgreSQL."
     >
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="text-left px-4 py-3 font-semibold">Txn</th>
-              <th className="text-left px-4 py-3 font-semibold">Student</th>
-              <th className="text-left px-4 py-3 font-semibold">Book</th>
-              <th className="text-left px-4 py-3 font-semibold">Borrowed</th>
-              <th className="text-left px-4 py-3 font-semibold">Due</th>
-              <th className="text-left px-4 py-3 font-semibold">Returned</th>
-              <th className="text-left px-4 py-3 font-semibold">Fine</th>
-              <th className="text-left px-4 py-3 font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((t, i) => {
-              const s = findStudent(t.studentId);
-              const b = findBook(t.bookId);
-              return (
-                <tr key={t.id} className={i % 2 ? "bg-[color-mix(in_oklch,var(--color-primary)_3%,var(--color-card))]" : ""}>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">#{t.id.toUpperCase()}</td>
+      {error && <Card className="mb-5 text-destructive">{error}</Card>}
+      <Card>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {["All", "Borrowed", "Returned", "Overdue"].map((item) => (
+            <button
+              key={item}
+              onClick={() => setFilter(item)}
+              className={`rounded-lg px-3 py-2 text-sm font-bold ${filter === item ? "bg-primary text-primary-foreground" : "border border-border hover:bg-accent"}`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Student</th>
+                <th className="px-4 py-3">Book</th>
+                <th className="px-4 py-3">RFID UID</th>
+                <th className="px-4 py-3">Scan date/time</th>
+                <th className="px-4 py-3">Due date</th>
+                <th className="px-4 py-3">Return date</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((txn) => (
+                <tr key={txn.id} className="border-t border-border">
                   <td className="px-4 py-3">
-                    <div className="font-semibold">{s?.name}</div>
-                    <div className="text-xs text-muted-foreground">{s?.studentCode}</div>
+                    <div className="font-semibold">{txn.studentName}</div>
+                    <div className="text-xs text-muted-foreground">{txn.studentEmail}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-semibold">{b?.title}</div>
-                    <div className="text-xs text-muted-foreground">{b?.author}</div>
+                    <div className="font-semibold">{txn.bookTitle}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{txn.bookId}</div>
                   </td>
-                  <td className="px-4 py-3 text-xs">{t.borrowDate}</td>
-                  <td className="px-4 py-3 text-xs">{t.dueDate}</td>
-                  <td className="px-4 py-3 text-xs">{t.returnDate ?? "—"}</td>
-                  <td className="px-4 py-3 font-semibold">
-                    {t.fineAmount > 0 ? (
-                      <span className="text-destructive">₹{t.fineAmount}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                  <td className="px-4 py-3 font-mono text-xs">{txn.rfidId}</td>
+                  <td className="px-4 py-3">{txn.scanDateTime}</td>
+                  <td className="px-4 py-3">{txn.dueDate ?? "-"}</td>
+                  <td className="px-4 py-3">{txn.returnDate ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={txn.status} />
                   </td>
-                  <td className="px-4 py-3"><StatusPill status={t.status} /></td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </AdminShell>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </AdminPrototypeShell>
   );
+}
+
+function readError(error: unknown) {
+  try {
+    return (
+      (JSON.parse((error as Error).message) as { message?: string }).message ?? "Request failed."
+    );
+  } catch {
+    return (error as Error).message || "Request failed.";
+  }
 }

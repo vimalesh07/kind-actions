@@ -78,7 +78,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Book Nest — Smart Library Management" },
-      { name: "description", content: "Book Nest is a smart college library management system with RFID auth, QR borrowing, fines, and analytics." },
+      {
+        name: "description",
+        content:
+          "Book Nest is a smart college library management system with RFID auth, QR borrowing, fines, and analytics.",
+      },
       { property: "og:title", content: "Book Nest — Smart Library Management" },
       { property: "og:description", content: "Your college library, reimagined." },
       { property: "og:type", content: "website" },
@@ -87,7 +91,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap",
+      },
       { rel: "stylesheet", href: appCss },
     ],
   }),
