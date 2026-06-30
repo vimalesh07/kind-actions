@@ -83,6 +83,25 @@ CREATE TABLE IF NOT EXISTS rfid_logs (
   scanned_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE rfid_logs ADD COLUMN IF NOT EXISTS uid TEXT;
+ALTER TABLE rfid_logs ADD COLUMN IF NOT EXISTS normalized_uid TEXT;
+ALTER TABLE rfid_logs ADD COLUMN IF NOT EXISTS device_id TEXT;
+ALTER TABLE rfid_logs ADD COLUMN IF NOT EXISTS result TEXT;
+ALTER TABLE rfid_logs ADD COLUMN IF NOT EXISTS message TEXT;
+
+CREATE TABLE IF NOT EXISTS rfid_scan_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expected_uid TEXT,
+  normalized_uid TEXT,
+  status TEXT NOT NULL DEFAULT 'waiting',
+  message TEXT NOT NULL DEFAULT 'Waiting for RFID card...',
+  device_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  verified_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS qr_logs (
   id TEXT PRIMARY KEY,
   qr_value TEXT NOT NULL,

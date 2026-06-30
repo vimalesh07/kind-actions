@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Mail, UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { GoogleSignInButton } from "@/components/booknest/GoogleSignInButton";
 import { Logo } from "@/components/booknest/Logo";
 import { departments, type Department } from "@/lib/booknest/data";
-import { signUp } from "@/lib/booknest/db.functions";
+import { signUp, signUpWithGoogle } from "@/lib/booknest/db.functions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Sign Up - Book Nest" }] }),
@@ -28,7 +29,25 @@ function SignupPage() {
 
     try {
       const user = await signUp({ data: form });
-      await navigate({ to: "/home", search: { userId: user.id } });
+      await navigate({ to: "/profile", search: { userId: user.id } });
+    } catch (caught) {
+      setError(readError(caught));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const continueWithGoogle = async (credential: string) => {
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const result = await signUpWithGoogle({ data: { credential } });
+      if (result.role === "admin") {
+        await navigate({ to: "/admin" });
+        return;
+      }
+      await navigate({ to: "/profile", search: { userId: result.user.id } });
     } catch (caught) {
       setError(readError(caught));
     } finally {
@@ -137,12 +156,7 @@ function SignupPage() {
               <UserPlus className="h-4 w-4" />
               {isSubmitting ? "Creating..." : "Sign Up"}
             </button>
-            <Link
-              to="/login"
-              className="mt-3 block w-full rounded-lg border border-border px-4 py-3 text-center text-sm font-bold hover:bg-accent"
-            >
-              Continue with Google
-            </Link>
+            <GoogleSignInButton onCredential={continueWithGoogle} disabled={isSubmitting} />
           </form>
         </section>
       </div>

@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { GoogleSignInButton } from "@/components/booknest/GoogleSignInButton";
 import { Logo } from "@/components/booknest/Logo";
-import { signIn } from "@/lib/booknest/db.functions";
+import { signIn, signInWithGoogle } from "@/lib/booknest/db.functions";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -38,15 +39,11 @@ function LoginPage() {
     }
   };
 
-  const continueWithGoogle = async () => {
-    if (!email.trim()) {
-      setError("Enter your registered email first.");
-      return;
-    }
+  const continueWithGoogle = async (credential: string) => {
     setError("");
     setIsSubmitting(true);
     try {
-      const result = await signIn({ data: { email } });
+      const result = await signInWithGoogle({ data: { credential } });
       if (result.role === "admin") {
         await navigate({ to: "/admin" });
         return;
@@ -135,14 +132,7 @@ function LoginPage() {
             >
               {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={continueWithGoogle}
-              className="mt-3 w-full rounded-lg border border-border px-4 py-3 text-sm font-bold hover:bg-accent disabled:opacity-60"
-            >
-              Continue with Google
-            </button>
+            <GoogleSignInButton onCredential={continueWithGoogle} disabled={isSubmitting} />
 
             <div className="mt-5 text-center text-sm text-muted-foreground">
               No student account?{" "}

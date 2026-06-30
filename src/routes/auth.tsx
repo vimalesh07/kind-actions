@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, KeyRound, Mail, UserPlus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { GoogleSignInButton } from "@/components/booknest/GoogleSignInButton";
 import { Logo } from "@/components/booknest/Logo";
 import { departments, type Department } from "@/lib/booknest/data";
-import { signIn, signUp } from "@/lib/booknest/db.functions";
+import { signIn, signInWithGoogle, signUp, signUpWithGoogle } from "@/lib/booknest/db.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Auth - Book Nest" }] }),
@@ -47,7 +48,7 @@ function AuthPage() {
     setIsSubmitting(true);
     try {
       const user = await signUp({ data: signup });
-      await navigate({ to: "/home", search: { userId: user.id } });
+      await navigate({ to: "/profile", search: { userId: user.id } });
     } catch (caught) {
       setError(readError(caught));
     } finally {
@@ -55,21 +56,22 @@ function AuthPage() {
     }
   };
 
-  const continueWithGoogle = async () => {
-    const email = mode === "signin" ? login.email : signup.email;
-    if (!email.trim()) {
-      setError("Enter your registered email first.");
-      return;
-    }
+  const continueWithGoogle = async (credential: string) => {
     setError("");
     setIsSubmitting(true);
     try {
-      const result = await signIn({ data: { email } });
+      const result =
+        mode === "signup"
+          ? await signUpWithGoogle({ data: { credential } })
+          : await signInWithGoogle({ data: { credential } });
       if (result.role === "admin") {
         await navigate({ to: "/admin" });
         return;
       }
-      await navigate({ to: "/home", search: { userId: result.user.id } });
+      await navigate({
+        to: mode === "signup" ? "/profile" : "/home",
+        search: { userId: result.user.id },
+      });
     } catch (caught) {
       setError(readError(caught));
     } finally {
@@ -192,14 +194,7 @@ function AuthPage() {
               </form>
             )}
 
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={continueWithGoogle}
-              className="mt-3 w-full rounded-lg border border-border px-4 py-3 text-sm font-bold hover:bg-accent disabled:opacity-60"
-            >
-              Continue with Google
-            </button>
+            <GoogleSignInButton onCredential={continueWithGoogle} disabled={isSubmitting} />
           </div>
         </section>
       </div>

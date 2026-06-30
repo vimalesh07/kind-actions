@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, Edit3, Search } from "lucide-react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AdminPrototypeShell, Card, StatusBadge } from "@/components/booknest/PrototypeShell";
-import { getUsers } from "@/lib/booknest/db.functions";
+import { getUsers, updateStudentRfid } from "@/lib/booknest/db.functions";
 import type { BorrowedBook, Department, UserProfile } from "@/lib/booknest/data";
 
 type AdminUser = UserProfile & { borrowedBooks: BorrowedBook[]; fineTotal: number };
@@ -16,12 +16,18 @@ function AdminStudentsPage() {
   const [students, setStudents] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [editingStudent, setEditingStudent] = useState<AdminUser | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     getUsers()
       .then((data) => setStudents(data as AdminUser[]))
       .catch((caught) => setError(readError(caught)));
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const q = query.toLowerCase();
   const filtered = students.filter(
@@ -37,6 +43,14 @@ function AdminStudentsPage() {
   return (
     <AdminPrototypeShell title="Students" subtitle="Students and RFID UIDs loaded from PostgreSQL.">
       {error && <Card className="mb-5 text-destructive">{error}</Card>}
+      {success && (
+        <Card className="mb-5 border-primary/30 bg-primary/10 text-sm font-semibold text-primary">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            {success}
+          </div>
+        </Card>
+      )}
       <Card>
         <div className="relative mb-4 max-w-xl">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -87,13 +101,114 @@ function AdminStudentsPage() {
               </div>
               <div className="mt-4 flex justify-between">
                 <StatusBadge status={student.fineTotal > 0 ? "Pending" : "Paid"} />
-                <button className="text-sm font-bold text-primary">View profile details</button>
+                <button
+                  onClick={() => setEditingStudent(student)}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-primary"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Edit RFID UID
+                </button>
               </div>
             </div>
           ))}
         </div>
       </Card>
+
+      {editingStudent && (
+        <EditRfidDialog
+          student={editingStudent}
+          onClose={() => setEditingStudent(null)}
+          onSaved={() => {
+            setEditingStudent(null);
+            setSuccess("RFID UID updated successfully.");
+            window.setTimeout(() => setSuccess(""), 3500);
+            refresh();
+          }}
+        />
+      )}
     </AdminPrototypeShell>
+  );
+}
+
+function EditRfidDialog({
+  student,
+  onClose,
+  onSaved,
+}: {
+  student: AdminUser;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [rfidId, setRfidId] = useState(student.rfidId ?? "");
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setIsSaving(true);
+
+    try {
+      await updateStudentRfid({ data: { userId: student.id, rfidId } });
+      onSaved();
+    } catch (caught) {
+      setError(readError(caught));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-lg bg-card p-6 shadow-elevated">
+        <h2 className="text-xl font-bold">Edit RFID UID</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Admin-only RFID assignment for {student.fullName}.
+        </p>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4">
+          <div className="rounded-lg bg-muted p-4 text-sm">
+            <div className="font-bold">{student.fullName}</div>
+            <div className="mt-1 text-muted-foreground">{student.email}</div>
+            <div className="mt-1 font-mono text-xs">{student.registerNumber}</div>
+          </div>
+          <label className="grid gap-2 text-sm font-semibold">
+            RFID UID
+            <input
+              value={rfidId}
+              onChange={(event) => setRfidId(event.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 font-mono"
+              placeholder="RFID-001"
+            />
+            <span className="text-xs font-medium text-muted-foreground">
+              RFID UID must be unique. Leave blank only when this student has no assigned card.
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-bold"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={isSaving}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

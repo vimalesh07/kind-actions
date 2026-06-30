@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CreditCard, QrCode, User } from "lucide-react";
+import { CreditCard, Edit3, QrCode, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, StatusBadge, UserShell } from "@/components/booknest/PrototypeShell";
 import { getUserDashboard } from "@/lib/booknest/db.functions";
@@ -54,6 +54,9 @@ function HomePage() {
     >
       <div className="grid gap-5 lg:grid-cols-[1fr_1.4fr]">
         <Card>
+          <div className="mb-4 text-xs font-bold uppercase text-muted-foreground">
+            Profile summary
+          </div>
           <div className="flex items-center gap-4">
             <div className="grid h-16 w-16 place-items-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
               {dashboard.user.photoInitials}
@@ -70,9 +73,17 @@ function HomePage() {
           </dl>
           <div className="mt-5 grid gap-2">
             <Link
-              to="/scanner"
+              to="/profile"
               search={{ userId }}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:bg-[var(--color-primary-dark)]"
+            >
+              <Edit3 className="h-4 w-4" />
+              Edit Profile
+            </Link>
+            <Link
+              to="/scanner"
+              search={{ userId, autoStart: "true" }}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-bold hover:bg-accent"
             >
               <QrCode className="h-4 w-4" />
               Start RFID Scan

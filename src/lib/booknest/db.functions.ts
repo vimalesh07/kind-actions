@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { randomUUID } from "node:crypto";
+import { OAuth2Client } from "google-auth-library";
 import { z } from "zod";
 
 import { departments } from "./data";
@@ -7,6 +9,29 @@ const departmentSchema = z.enum(departments as [string, ...string[]]);
 
 function fail(error: unknown): never {
   throw new Error(JSON.stringify(error));
+}
+
+async function verifyGoogleCredential(credential: string) {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    fail({ message: "Google sign-in is not configured.", code: "GOOGLE_CONFIG_MISSING" });
+  }
+
+  const client = new OAuth2Client(clientId);
+  const ticket = await client.verifyIdToken({
+    idToken: credential,
+    audience: clientId,
+  });
+  const payload = ticket.getPayload();
+  const email = payload?.email;
+  if (!email || !payload.email_verified) {
+    throw new Error("Google account email is not verified.");
+  }
+
+  return {
+    email,
+    fullName: payload.name?.trim() || email.split("@")[0],
+  };
 }
 
 export const signIn = createServerFn({ method: "POST" })
@@ -20,6 +45,56 @@ export const signIn = createServerFn({ method: "POST" })
       const db = await import("./db.server");
       const user = await db.getUserByEmail(data.email);
       return { role: "user" as const, user };
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const signInWithGoogle = createServerFn({ method: "POST" })
+  .validator(z.object({ credential: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const { email } = await verifyGoogleCredential(data.credential);
+
+      if (email === "admin@gmail.com") {
+        return { role: "admin" as const };
+      }
+
+      const db = await import("./db.server");
+      const user = await db.getUserByEmail(email);
+      return { role: "user" as const, user };
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const signUpWithGoogle = createServerFn({ method: "POST" })
+  .validator(z.object({ credential: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const { email, fullName } = await verifyGoogleCredential(data.credential);
+      if (email === "admin@gmail.com") {
+        return { role: "admin" as const };
+      }
+
+      const db = await import("./db.server");
+      try {
+        const user = await db.getUserByEmail(email);
+        return { role: "user" as const, user, created: false };
+      } catch (lookupError) {
+        if (!String((lookupError as Error).message).includes("User not found")) {
+          throw lookupError;
+        }
+        const user = await db.createUser({
+          fullName,
+          email,
+          registerNumber: `PENDING-${randomUUID().slice(0, 8).toUpperCase()}`,
+          department: "CSE" as never,
+        });
+        return { role: "user" as const, user, created: true };
+      }
     } catch (error) {
       const db = await import("./db.server");
       fail(db.publicError(error));
@@ -67,9 +142,9 @@ export const updateUserProfile = createServerFn({ method: "POST" })
     z.object({
       userId: z.string().min(1),
       fullName: z.string().trim().min(2),
-      email: z.string().email(),
       registerNumber: z.string().trim().min(2),
       department: departmentSchema,
+      photoInitials: z.string().trim().min(1).max(4).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -78,9 +153,77 @@ export const updateUserProfile = createServerFn({ method: "POST" })
       return db.updateUserProfile({
         userId: data.userId,
         fullName: data.fullName,
-        email: data.email,
         registerNumber: data.registerNumber,
         department: data.department as never,
+        photoInitials: data.photoInitials,
+      });
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const startRfidScanSession = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const db = await import("./db.server");
+      return db.createRfidScanSessionForUser(data.userId);
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const getRfidScanStatus = createServerFn({ method: "GET" })
+  .validator(z.object({ sessionId: z.string().min(1), userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const db = await import("./db.server");
+      return db.getRfidScanSessionStatus(data.sessionId, data.userId);
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const cancelRfidScanSession = createServerFn({ method: "POST" })
+  .validator(z.object({ sessionId: z.string().min(1), userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const db = await import("./db.server");
+      return db.cancelRfidScanSession(data.sessionId, data.userId);
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const getBookScanAccess = createServerFn({ method: "GET" })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    try {
+      const db = await import("./db.server");
+      return db.getVerifiedRfidBookScanSession(data.userId);
+    } catch (error) {
+      const db = await import("./db.server");
+      fail(db.publicError(error));
+    }
+  });
+
+export const updateStudentRfid = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      userId: z.string().min(1),
+      rfidId: z.string().trim().max(64),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const db = await import("./db.server");
+      return db.updateStudentRfid({
+        userId: data.userId,
+        rfidId: data.rfidId,
       });
     } catch (error) {
       const db = await import("./db.server");

@@ -16,6 +16,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
+import { Route as BookScanRouteImport } from './routes/book-scan'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -60,6 +61,11 @@ const LoginRoute = LoginRouteImport.update({
 const HomeRoute = HomeRouteImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookScanRoute = BookScanRouteImport.update({
+  id: '/book-scan',
+  path: '/book-scan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/book-scan': typeof BookScanRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/book-scan': typeof BookScanRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/book-scan': typeof BookScanRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/payments': typeof PaymentsRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/book-scan'
     | '/home'
     | '/login'
     | '/payments'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/book-scan'
     | '/home'
     | '/login'
     | '/payments'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/book-scan'
     | '/home'
     | '/login'
     | '/payments'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BookScanRoute: typeof BookScanRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   PaymentsRoute: typeof PaymentsRoute
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/book-scan': {
+      id: '/book-scan'
+      path: '/book-scan'
+      fullPath: '/book-scan'
+      preLoaderRoute: typeof BookScanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -391,6 +411,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  BookScanRoute: BookScanRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   PaymentsRoute: PaymentsRoute,

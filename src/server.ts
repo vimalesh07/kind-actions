@@ -7,7 +7,28 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+type RfidSessionStatus = "waiting" | "verified" | "failed";
+
+type PendingRfidSession = {
+  userId: string;
+  status: RfidSessionStatus;
+  message: string;
+  scannedUid: string | null;
+  user:
+    | {
+        id: string;
+        name: string;
+        email: string;
+        register_number: string;
+        department: string;
+        rfid_uid: string | null;
+      }
+    | null;
+  updatedAt: number;
+};
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
+const pendingRfidSessions = new Map<string, PendingRfidSession>();
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
@@ -58,20 +79,132 @@ export default {
 
 async function handleBookNestApi(request: Request) {
   const url = new URL(request.url);
+  const corsHeaders = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "content-type",
+  };
+
+  if (request.method === "OPTIONS" && url.pathname.startsWith("/api/rfid/")) {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/rfid/ping") {
+    return Response.json({
+      ok: true,
+      message: "RFID API reachable",
+    }, { headers: corsHeaders });
+  }
+
   if (request.method !== "POST") return null;
+
+  if (url.pathname === "/api/rfid/start") {
+    try {
+      const body = (await request.json()) as { user_id?: string; userId?: string };
+      const userId = body.user_id ?? body.userId ?? "";
+      if (!userId.trim()) {
+        return Response.json({ success: false, message: "User ID is required" }, { status: 400 });
+      }
+
+      const db = await import("./lib/booknest/db.server");
+      const dashboard = await db.getUserDashboard(userId.trim());
+      const rfidUid = normalizeRfid(dashboard.user.rfidId ?? "");
+      pendingRfidSessions.set(dashboard.user.id, {
+        userId: dashboard.user.id,
+        status: "waiting",
+        message: "Waiting for RFID card...",
+        scannedUid: null,
+        user: {
+          id: dashboard.user.id,
+          name: dashboard.user.fullName,
+          email: dashboard.user.email,
+          register_number: dashboard.user.registerNumber,
+          department: dashboard.user.department,
+          rfid_uid: rfidUid || dashboard.user.rfidId,
+        },
+        updatedAt: Date.now(),
+      });
+
+      return Response.json({
+        success: true,
+        status: "waiting",
+        message: "Waiting for RFID card...",
+        expected_rfid_uid: rfidUid,
+      });
+    } catch (error) {
+      return Response.json({ success: false, message: readPublicError(error) }, { status: 400 });
+    }
+  }
+
+  if (url.pathname === "/api/rfid/status") {
+    try {
+      const body = (await request.json()) as { user_id?: string; userId?: string };
+      const userId = body.user_id ?? body.userId ?? "";
+      const session = pendingRfidSessions.get(userId.trim());
+      if (!session) {
+        return Response.json({
+          success: false,
+          status: "idle",
+          message: "RFID scan has not started.",
+        });
+      }
+
+      return Response.json({
+        success: session.status === "verified",
+        status: session.status,
+        message: session.message,
+        rfid_uid: session.scannedUid,
+        user: session.user,
+      });
+    } catch (error) {
+      return Response.json({ success: false, message: readPublicError(error) }, { status: 400 });
+    }
+  }
+
+  if (url.pathname === "/api/rfid/scan") {
+    try {
+      const body = (await request.json()) as {
+        uid?: string;
+        normalizedUid?: string;
+        deviceId?: string;
+        rfid_uid?: string;
+        rfidId?: string;
+      };
+      console.log("[RFID_SCAN_REQUEST]", {
+        uid: body.uid ?? body.rfid_uid ?? body.rfidId ?? "",
+        normalizedUid: body.normalizedUid ?? "",
+        deviceId: body.deviceId ?? "",
+        timestamp: new Date().toISOString(),
+      });
+      const db = await import("./lib/booknest/db.server");
+      const result = await db.receiveHardwareRfidScan({
+        uid: body.uid ?? body.rfid_uid ?? body.rfidId,
+        normalizedUid: body.normalizedUid,
+        deviceId: body.deviceId,
+      });
+      return Response.json(result, { status: 200, headers: corsHeaders });
+    } catch (error) {
+      return Response.json(
+        { ok: false, status: "error", message: readPublicError(error) },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+  }
 
   if (url.pathname === "/api/rfid/verify") {
     try {
       const body = (await request.json()) as { rfid_uid?: string; rfidId?: string };
-      const rfidUid = body.rfid_uid ?? body.rfidId ?? "";
-      if (!rfidUid.trim()) {
+      const rfidUid = normalizeRfid(body.rfid_uid ?? body.rfidId ?? "");
+      if (!rfidUid) {
         return Response.json({ success: false, message: "RFID UID is required" }, { status: 400 });
       }
 
       const db = await import("./lib/booknest/db.server");
-      const result = await db.verifyRfid(rfidUid.trim());
+      const result = await db.verifyRfid(rfidUid);
       return Response.json({
         success: true,
+        message: "RFID verified successfully",
+        rfid_uid: normalizeRfid(result.user.rfidId ?? rfidUid),
         user: {
           id: result.user.id,
           full_name: result.user.fullName,
@@ -142,6 +275,10 @@ async function handleBookNestApi(request: Request) {
   }
 
   return null;
+}
+
+function normalizeRfid(value: string) {
+  return value.replace(/\s+/g, "").toUpperCase();
 }
 
 function readPublicError(error: unknown) {

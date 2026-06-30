@@ -2,6 +2,7 @@ import process from "node:process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 
 import type {
@@ -21,7 +22,20 @@ import type {
 
 const { Pool } = pg;
 
-let pool: pg.Pool | undefined;
+type Queryable = {
+  query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }>;
+};
+
+type DbClient = Queryable & {
+  release(): void;
+};
+
+type DbPool = Queryable & {
+  connect(): Promise<DbClient>;
+  exec?(sql: string): Promise<unknown>;
+};
+
+let pool: DbPool | undefined;
 let schemaReady: Promise<void> | undefined;
 
 class AppError extends Error {
@@ -42,12 +56,34 @@ function getPool() {
     );
   }
 
-  pool ??= new Pool({
-    connectionString: stripSslMode(databaseUrl),
-    ssl: { rejectUnauthorized: false },
-  });
+  pool ??= databaseUrl.startsWith("pglite:")
+    ? createPglitePool(databaseUrl)
+    : new Pool({
+        connectionString: stripSslMode(databaseUrl),
+        ssl: { rejectUnauthorized: false },
+      });
 
   return pool;
+}
+
+function createPglitePool(databaseUrl: string): DbPool {
+  const db = new PGlite(getPgliteDataDir(databaseUrl));
+  return {
+    query: (sql, values) => db.query(sql, values),
+    exec: (sql) => db.exec(sql),
+    async connect() {
+      return {
+        query: (sql, values) => db.query(sql, values),
+        release() {},
+      };
+    },
+  };
+}
+
+function getPgliteDataDir(databaseUrl: string) {
+  const rawPath = databaseUrl.replace(/^pglite:\/\//, "");
+  if (!rawPath || rawPath === "memory") return "memory://booknest";
+  return path.resolve(process.cwd(), rawPath);
 }
 
 function stripSslMode(databaseUrl: string) {
@@ -62,7 +98,12 @@ async function ensureSchema() {
       path.join(process.cwd(), "src", "lib", "booknest", "schema.sql"),
       "utf8",
     );
-    await getPool().query(schema);
+    const pool = getPool();
+    if (pool.exec) {
+      await pool.exec(schema);
+    } else {
+      await pool.query(schema);
+    }
     await seedPrototypeData();
   })();
 
@@ -87,6 +128,10 @@ export function publicError(error: unknown) {
     return { message: error.message, code: error.code };
   }
   return { message: (error as Error).message || "Unexpected server error.", code: "SERVER_ERROR" };
+}
+
+export function normalizeRfidUid(uid: string) {
+  return uid.toUpperCase().replace(/[^0-9A-F]/g, "");
 }
 
 export async function createUser(input: {
@@ -148,31 +193,98 @@ export async function getUserByEmail(email: string): Promise<UserProfile> {
 export async function updateUserProfile(input: {
   userId: string;
   fullName: string;
-  email: string;
   registerNumber: string;
   department: Department;
+  photoInitials?: string;
 }): Promise<UserProfile> {
+  const photoInitials = (input.photoInitials?.trim() || makeInitials(input.fullName)).toUpperCase();
   const result = await query<UserRow>(
     `UPDATE users
      SET full_name = $2,
-         email = $3,
-         register_number = $4,
-         department = $5,
-         photo_initials = $6
+         register_number = $3,
+         department = $4,
+         photo_initials = $5
      WHERE id = $1
      RETURNING id, full_name, email, register_number, department, photo_initials, NULL::text AS rfid_id`,
     [
       input.userId,
       input.fullName.trim(),
-      input.email.trim(),
       input.registerNumber.trim(),
       input.department,
-      makeInitials(input.fullName),
+      photoInitials,
     ],
   );
 
   if (!result.rows[0]) throw new AppError("User not found.", "USER_NOT_FOUND");
   return getUserById(input.userId);
+}
+
+export async function updateStudentRfid(input: {
+  userId: string;
+  rfidId: string;
+}): Promise<UserProfile> {
+  const rfidId = input.rfidId.trim();
+  const client = await getPool().connect();
+
+  try {
+    await ensureSchema();
+    await client.query("BEGIN");
+
+    const userResult = await client.query<UserRow>(
+      `SELECT u.*, COALESCE(u.rfid_uid, r.rfid_id) AS rfid_id
+       FROM users u
+       LEFT JOIN rfid_cards r ON r.user_id = u.id AND r.is_active = TRUE
+       WHERE u.id = $1
+       LIMIT 1`,
+      [input.userId],
+    );
+    if (!userResult.rows[0]) throw new AppError("User not found.", "USER_NOT_FOUND");
+
+    if (!rfidId) {
+      await client.query(`UPDATE users SET rfid_uid = NULL WHERE id = $1`, [input.userId]);
+      await client.query(`UPDATE rfid_cards SET is_active = FALSE WHERE user_id = $1`, [
+        input.userId,
+      ]);
+      await client.query("COMMIT");
+      return getUserById(input.userId);
+    }
+
+    const duplicate = await client.query<{ id: string }>(
+      `SELECT id
+       FROM (
+         SELECT u.id, u.rfid_uid AS rfid_id FROM users u WHERE u.rfid_uid IS NOT NULL
+         UNION ALL
+         SELECT r.user_id AS id, r.rfid_id FROM rfid_cards r WHERE r.is_active = TRUE
+       ) assigned
+       WHERE LOWER(assigned.rfid_id) = LOWER($1) AND assigned.id <> $2
+       LIMIT 1`,
+      [rfidId, input.userId],
+    );
+    if (duplicate.rows[0]) {
+      throw new AppError("RFID UID is already assigned to another student.", "RFID_DUPLICATE");
+    }
+
+    await client.query(`UPDATE users SET rfid_uid = $2 WHERE id = $1`, [input.userId, rfidId]);
+    await client.query(
+      `INSERT INTO rfid_cards (id, user_id, rfid_id, is_active)
+       VALUES ($1, $2, $3, TRUE)
+       ON CONFLICT (user_id) DO UPDATE SET rfid_id = EXCLUDED.rfid_id, is_active = TRUE`,
+      [`rfid-${input.userId}`, input.userId, rfidId],
+    );
+
+    await client.query("COMMIT");
+    return getUserById(input.userId);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error instanceof AppError) throw error;
+    const message = (error as Error).message;
+    if (message.toLowerCase().includes("unique")) {
+      throw new AppError("RFID UID is already assigned to another student.", "RFID_DUPLICATE");
+    }
+    throw new AppError(`RFID update failed: ${message}`, "RFID_UPDATE_FAILED");
+  } finally {
+    client.release();
+  }
 }
 
 export async function getUserDashboard(userId: string): Promise<UserDashboard> {
@@ -186,19 +298,224 @@ export async function getUserDashboard(userId: string): Promise<UserDashboard> {
 }
 
 export async function verifyRfid(rfidId: string): Promise<RfidVerification> {
+  const normalizedRfid = normalizeRfid(rfidId);
   const result = await query<UserRow>(
     `SELECT u.*, COALESCE(u.rfid_uid, r.rfid_id) AS rfid_id
      FROM rfid_cards r
      INNER JOIN users u ON u.id = r.user_id
-     WHERE (r.rfid_id = $1 OR u.rfid_uid = $1) AND r.is_active = TRUE
+     WHERE (
+       UPPER(REGEXP_REPLACE(r.rfid_id, '[^0-9A-Fa-f]', '', 'g')) = $1
+       OR UPPER(REGEXP_REPLACE(COALESCE(u.rfid_uid, ''), '[^0-9A-Fa-f]', '', 'g')) = $1
+     ) AND r.is_active = TRUE
      LIMIT 1`,
-    [rfidId],
+    [normalizedRfid],
   );
   const user = result.rows[0];
-  await logRfidScan(rfidId, user?.id ?? null, user ? "Verified" : "Rejected");
+  await logRfidScan(normalizedRfid, user?.id ?? null, user ? "Verified" : "Rejected");
   if (!user) throw new AppError("RFID card not registered.", "RFID_NOT_MATCHED");
   const profile = mapUser(user);
   return { user: profile, borrowedBooks: await getBorrowedBooks(profile.id) };
+}
+
+export async function findUserByRfid(rfidId: string): Promise<UserProfile | null> {
+  return findUserByRfidUid(rfidId);
+}
+
+export async function findUserByRfidUid(rfidId: string): Promise<UserProfile | null> {
+  const normalizedRfid = normalizeRfid(rfidId);
+  const result = await query<UserRow>(
+    `SELECT u.*, COALESCE(u.rfid_uid, r.rfid_id) AS rfid_id
+     FROM users u
+     LEFT JOIN rfid_cards r ON r.user_id = u.id AND r.is_active = TRUE
+     WHERE (
+       UPPER(REGEXP_REPLACE(COALESCE(u.rfid_uid, ''), '[^0-9A-Fa-f]', '', 'g')) = $1
+       OR UPPER(REGEXP_REPLACE(COALESCE(r.rfid_id, ''), '[^0-9A-Fa-f]', '', 'g')) = $1
+     )
+     LIMIT 1`,
+    [normalizedRfid],
+  );
+  return result.rows[0] ? mapUser(result.rows[0]) : null;
+}
+
+export async function createRfidScanSessionForUser(userId: string) {
+  const user = await getUserById(userId);
+  const normalizedUid = normalizeRfid(user.rfidId ?? "");
+  const sessionId = `rfidsession-${randomUUID()}`;
+
+  await query(
+    `UPDATE rfid_scan_sessions
+     SET status = 'expired',
+         message = 'RFID scan expired. Please try again.'
+     WHERE user_id = $1 AND status = 'waiting'`,
+    [user.id],
+  );
+  await query(
+    `INSERT INTO rfid_scan_sessions
+       (id, user_id, expected_uid, normalized_uid, status, message, expires_at)
+     VALUES ($1, $2, $3, $4, 'waiting', 'Waiting for RFID card...', NOW() + INTERVAL '60 seconds')`,
+    [sessionId, user.id, user.rfidId ?? null, normalizedUid || null],
+  );
+
+  return {
+    ok: true,
+    sessionId,
+    status: "waiting" as const,
+    message: "Waiting for RFID card...",
+  };
+}
+
+export async function getRfidScanSessionStatus(sessionId: string, currentUserId: string) {
+  await expireWaitingRfidSession(sessionId, currentUserId);
+  const result = await query<RfidScanSessionRow>(
+    `SELECT *
+     FROM rfid_scan_sessions
+     WHERE id = $1 AND user_id = $2
+     LIMIT 1`,
+    [sessionId, currentUserId],
+  );
+  const session = result.rows[0];
+  if (!session) {
+    throw new AppError("RFID scan session not found.", "RFID_SESSION_NOT_FOUND");
+  }
+
+  return {
+    ok: true,
+    status: session.status as RfidScanStatus,
+    message: session.message,
+    openBookScanner: session.status === "verified",
+    normalizedUid: session.normalized_uid,
+  };
+}
+
+export async function cancelRfidScanSession(sessionId: string, currentUserId: string) {
+  await query(
+    `UPDATE rfid_scan_sessions
+     SET status = 'expired',
+         message = 'RFID scan cancelled.'
+     WHERE id = $1 AND user_id = $2 AND status = 'waiting'`,
+    [sessionId, currentUserId],
+  );
+  return { ok: true, status: "expired" as const, message: "RFID scan cancelled." };
+}
+
+export async function getVerifiedRfidBookScanSession(userId: string) {
+  const result = await query<RfidScanSessionRow>(
+    `SELECT *
+     FROM rfid_scan_sessions
+     WHERE user_id = $1
+       AND status = 'verified'
+       AND verified_at IS NOT NULL
+       AND verified_at > NOW() - INTERVAL '5 minutes'
+     ORDER BY verified_at DESC
+     LIMIT 1`,
+    [userId],
+  );
+  const session = result.rows[0];
+  if (!session) {
+    throw new AppError("Please verify RFID first.", "RFID_VERIFICATION_REQUIRED");
+  }
+
+  return {
+    ok: true,
+    user: await getUserById(userId),
+    session: {
+      id: session.id,
+      normalizedUid: session.normalized_uid,
+      verifiedAt: session.verified_at,
+    },
+  };
+}
+
+export async function receiveHardwareRfidScan(input: {
+  uid?: string;
+  normalizedUid?: string;
+  deviceId?: string;
+}) {
+  const uid = (input.uid || input.normalizedUid || "").trim();
+  const normalizedUid = normalizeRfid(input.normalizedUid || uid);
+  const deviceId = input.deviceId?.trim() || null;
+  if (!normalizedUid) {
+    throw new AppError("RFID UID is required.", "RFID_UID_REQUIRED");
+  }
+
+  const user = await findUserByRfidUid(normalizedUid);
+  if (!user) {
+    await insertRfidHardwareLog({
+      uid,
+      normalizedUid,
+      deviceId,
+      userId: null,
+      result: "unknown_card",
+      message: "RFID card not assigned to any student",
+    });
+    await failLatestWaitingRfidSession(
+      "RFID card not assigned to any student",
+      normalizedUid,
+      deviceId,
+    );
+    return {
+      ok: false,
+      status: "unknown_card" as const,
+      message: "RFID card not assigned to any student",
+      normalizedUid,
+    };
+  }
+
+  const session = await getLatestWaitingRfidSession(user.id);
+  if (session) {
+    await query(
+      `UPDATE rfid_scan_sessions
+       SET status = 'verified',
+           verified_at = NOW(),
+           message = 'RFID verified',
+           device_id = $3,
+           normalized_uid = $4
+       WHERE id = $1 AND user_id = $2`,
+      [session.id, user.id, deviceId, normalizedUid],
+    );
+    await insertRfidHardwareLog({
+      uid,
+      normalizedUid,
+      deviceId,
+      userId: user.id,
+      result: "verified",
+      message: "RFID verified",
+    });
+    return {
+      ok: true,
+      status: "verified" as const,
+      message: "RFID verified",
+      normalizedUid,
+    };
+  }
+
+  const mismatchedSession = await getLatestWaitingRfidSessionForOtherUser(user.id);
+  if (mismatchedSession) {
+    await query(
+      `UPDATE rfid_scan_sessions
+       SET status = 'failed',
+           message = 'RFID card belongs to another student',
+           device_id = $2,
+           normalized_uid = $3
+       WHERE id = $1`,
+      [mismatchedSession.id, deviceId, normalizedUid],
+    );
+  }
+
+  await insertRfidHardwareLog({
+    uid,
+    normalizedUid,
+    deviceId,
+    userId: user.id,
+    result: "user_found_no_waiting_session",
+    message: "RFID user found, but no active scan session",
+  });
+  return {
+    ok: true,
+    status: "user_found_no_waiting_session" as const,
+    message: "RFID user found, but no active scan session",
+    normalizedUid,
+  };
 }
 
 export async function getBooks(): Promise<Book[]> {
@@ -270,7 +587,9 @@ export async function recordBookAction(input: {
   action: Exclude<TransactionStatus, "Overdue">;
 }) {
   const user = await getUserById(input.userId);
-  if (user.rfidId !== input.rfidId) throw new AppError("RFID not matched.", "RFID_NOT_MATCHED");
+  if (normalizeRfid(user.rfidId ?? "") !== normalizeRfid(input.rfidId)) {
+    throw new AppError("RFID not matched.", "RFID_NOT_MATCHED");
+  }
   const book = await getBook(input.bookId);
   const id = `txn-${randomUUID()}`;
   const dueDate = input.action === "Borrowed" ? addDays(new Date(), 14) : null;
@@ -499,10 +818,109 @@ async function makeNextRfidId() {
 }
 
 async function logRfidScan(rfidId: string, userId: string | null, status: string) {
+  const normalizedUid = normalizeRfid(rfidId);
   await query(
-    `INSERT INTO rfid_logs (id, rfid_uid, user_id, status)
-     VALUES ($1, $2, $3, $4)`,
-    [`rfidlog-${randomUUID()}`, rfidId, userId, status],
+    `INSERT INTO rfid_logs
+       (id, rfid_uid, uid, normalized_uid, user_id, status, result, message)
+     VALUES ($1, $2, $3, $4, $5, $6, $6, $6)`,
+    [`rfidlog-${randomUUID()}`, normalizedUid || rfidId, rfidId, normalizedUid, userId, status],
+  );
+}
+
+function normalizeRfid(value: string) {
+  return normalizeRfidUid(value);
+}
+
+async function expireWaitingRfidSession(sessionId: string, currentUserId: string) {
+  await query(
+    `UPDATE rfid_scan_sessions
+     SET status = 'expired',
+         message = 'RFID scan expired. Please try again.'
+     WHERE id = $1
+       AND user_id = $2
+       AND status = 'waiting'
+       AND expires_at <= NOW()`,
+    [sessionId, currentUserId],
+  );
+}
+
+async function getLatestWaitingRfidSession(userId: string) {
+  const result = await query<RfidScanSessionRow>(
+    `SELECT *
+     FROM rfid_scan_sessions
+     WHERE user_id = $1
+       AND status = 'waiting'
+       AND expires_at > NOW()
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function getLatestWaitingRfidSessionForOtherUser(userId: string) {
+  const result = await query<RfidScanSessionRow>(
+    `SELECT *
+     FROM rfid_scan_sessions
+     WHERE user_id <> $1
+       AND status = 'waiting'
+       AND expires_at > NOW()
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function failLatestWaitingRfidSession(
+  message: string,
+  normalizedUid: string,
+  deviceId: string | null,
+) {
+  const result = await query<RfidScanSessionRow>(
+    `SELECT *
+     FROM rfid_scan_sessions
+     WHERE status = 'waiting'
+       AND expires_at > NOW()
+     ORDER BY created_at DESC
+     LIMIT 1`,
+  );
+  const session = result.rows[0];
+  if (!session) return;
+
+  await query(
+    `UPDATE rfid_scan_sessions
+     SET status = 'failed',
+         message = $2,
+         normalized_uid = $3,
+         device_id = $4
+     WHERE id = $1`,
+    [session.id, message, normalizedUid, deviceId],
+  );
+}
+
+async function insertRfidHardwareLog(input: {
+  uid: string;
+  normalizedUid: string;
+  deviceId: string | null;
+  userId: string | null;
+  result: string;
+  message: string;
+}) {
+  await query(
+    `INSERT INTO rfid_logs
+       (id, rfid_uid, uid, normalized_uid, device_id, user_id, status, result, message)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8)`,
+    [
+      `rfidlog-${randomUUID()}`,
+      input.normalizedUid,
+      input.uid || input.normalizedUid,
+      input.normalizedUid,
+      input.deviceId,
+      input.userId,
+      input.result,
+      input.message,
+    ],
   );
 }
 
@@ -717,4 +1135,19 @@ type BorrowedBookRow = {
   borrowed_date: Date | string;
   due_date: Date | string;
   fine_amount: string;
+};
+
+type RfidScanStatus = "waiting" | "verified" | "failed" | "expired";
+
+type RfidScanSessionRow = {
+  id: string;
+  user_id: string;
+  expected_uid: string | null;
+  normalized_uid: string | null;
+  status: string;
+  message: string;
+  device_id: string | null;
+  created_at: Date | string;
+  expires_at: Date | string;
+  verified_at: Date | string | null;
 };
