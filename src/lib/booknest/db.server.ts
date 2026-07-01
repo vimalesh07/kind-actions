@@ -1,9 +1,9 @@
 import process from "node:process";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
+import schemaSql from "./schema.sql?raw";
 
 import type {
   AdminDashboard,
@@ -94,15 +94,11 @@ function stripSslMode(databaseUrl: string) {
 
 async function ensureSchema() {
   schemaReady ??= (async () => {
-    const schema = await readFile(
-      path.join(process.cwd(), "src", "lib", "booknest", "schema.sql"),
-      "utf8",
-    );
     const pool = getPool();
     if (pool.exec) {
-      await pool.exec(schema);
+      await pool.exec(schemaSql);
     } else {
-      await pool.query(schema);
+      await pool.query(schemaSql);
     }
     await seedPrototypeData();
   })();
