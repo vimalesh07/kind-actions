@@ -83,6 +83,7 @@ function createPglitePool(databaseUrl: string): DbPool {
 function getPgliteDataDir(databaseUrl: string) {
   const rawPath = databaseUrl.replace(/^pglite:\/\//, "");
   if (!rawPath || rawPath === "memory") return "memory://booknest";
+  if (process.env.NETLIFY) return path.join("/tmp", rawPath);
   return path.resolve(process.cwd(), rawPath);
 }
 
